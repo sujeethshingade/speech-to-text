@@ -57,10 +57,16 @@ export function Chatbot() {
             })
 
             if (!response.ok) {
-                throw new Error("Failed to transcribe audio")
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.error || `HTTP ${response.status}: Failed to transcribe audio`)
             }
 
             const data = await response.json()
+
+            // Handle the new API response format
+            if (data.success === false) {
+                throw new Error(data.error || "Transcription failed")
+            }
 
             // Return the transcribed text instead of sending it automatically
             return data.text && data.text.trim() ? data.text : ""
