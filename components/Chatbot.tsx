@@ -91,7 +91,9 @@ export function Chatbot({ transcriptionMethod = 'local' }: ChatbotProps) {
             mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" })
                 const text = await transcribeAudio(audioBlob)
-                if (text) setMessage(text)
+                if (text) {
+                    setMessage(prev => prev ? `${prev} ${text}` : text)
+                }
                 stream.getTracks().forEach(track => track.stop())
             }
 
@@ -140,7 +142,7 @@ export function Chatbot({ transcriptionMethod = 'local' }: ChatbotProps) {
                     disabled={isTranscribing}
                     className={cn(
                         "transition-all duration-200 text-gray-900",
-                        isRecording && "bg-red-500 text-white hover:bg-red-600 border-red-500 animate-pulse",
+                        isRecording && "bg-red-500 text-white hover:bg-red-600 hover:text-white border-red-500 animate-pulse",
                         isTranscribing && "opacity-50"
                     )}
                 >
