@@ -4,21 +4,6 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const audioFile = formData.get('audio') as File
-
-    if (!audioFile) {
-      return NextResponse.json(
-        { error: 'No audio file provided', success: false },
-        { status: 400 }
-      )
-    }
-
-    // Check file size (25MB limit)
-    if (audioFile.size > 25 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: 'File too large. Maximum size is 25MB.', success: false },
-        { status: 413 }
-      )
-    }    // Forward to Flask backend (existing local Whisper implementation)
     const flaskFormData = new FormData()
     flaskFormData.append('audio', audioFile)
 
@@ -26,14 +11,10 @@ export async function POST(request: NextRequest) {
       ? 'http://127.0.0.1:5328/api/transcribe'
       : '/api/transcribe'
 
-    console.log('Forwarding to Flask at:', flaskUrl)
-
     const response = await fetch(flaskUrl, {
       method: 'POST',
       body: flaskFormData
     })
-
-    console.log('Flask response status:', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -44,8 +25,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const result = await response.json()
-    return NextResponse.json(result)
+    return NextResponse.json(await response.json())
   } catch (error) {
     console.error('Local transcription error:', error)
     
@@ -56,9 +36,6 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    return NextResponse.json(
-      { error: 'Internal server error', success: false },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error', success: false }, { status: 500 })
   }
 }

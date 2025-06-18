@@ -2,12 +2,12 @@
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
+type TranscriptionMethod = 'local' | 'api'
+
 interface NavbarProps {
     transcriptionMethod?: TranscriptionMethod
     onTranscriptionMethodChange?: (method: TranscriptionMethod) => void
 }
-
-type TranscriptionMethod = 'local' | 'api'
 
 export function Navbar({
     transcriptionMethod = 'local',
@@ -15,10 +15,11 @@ export function Navbar({
 }: NavbarProps) {
     return (
         <div className="flex-shrink-0 border-b bg-card px-4 py-3 flex items-center justify-between">
-            <h1 className="text-xl font-semibold text-foreground">
+
+            <h1 className="text-md font-semibold text-foreground">
                 Speech-to-Text Chatbot
             </h1>
-
+            
             <Tabs
                 value={transcriptionMethod}
                 onValueChange={(value) => onTranscriptionMethodChange?.(value as TranscriptionMethod)}
