@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Mic, MicOff, Send } from "lucide-react"
@@ -12,40 +12,33 @@ export function Chatbot() {
     const [isRecording, setIsRecording] = useState(false)
     const [isTranscribing, setIsTranscribing] = useState(false)
     const [message, setMessage] = useState("")
-    const [isRecordingState, setIsRecordingState] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const chunksRef = useRef<Blob[]>([])
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-    }
-
+    // Auto-scroll to latest message
     useEffect(() => {
-        scrollToBottom()
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
     }, [messages])
 
-    const handleSendMessage = useCallback((text: string) => {
-        const newMessage: Message = {
-            id: Date.now().toString(),
-            text,
-            isUser: true,
-        }
+    // Add a new message to the chat
+    const handleSendMessage = (text: string) => {
+        const newMessage: Message = { id: Date.now().toString(), text, isUser: true }
+        setMessages(prev => [...prev, newMessage])
 
-        setMessages((prev) => [...prev, newMessage])
-
-        // Simulate AI response
+        // Simulate AI response (replace with actual AI integration)
         setTimeout(() => {
             const aiResponse: Message = {
                 id: (Date.now() + 1).toString(),
-                text: "I received your message: \"" + text + "\". This is a demo response. In a real application, this would be processed by an AI model.",
+                text: `Received your message: "${text}". This is a demo response.`,
                 isUser: false,
             }
-            setMessages((prev) => [...prev, aiResponse])
+            setMessages(prev => [...prev, aiResponse])
         }, 1000)
-    }, [])
+    }
 
-    const handleAudioTranscribe = async (audioBlob: Blob) => {
+    // Send audio to backend for transcription
+    const transcribeAudio = async (audioBlob: Blob) => {
         try {
             setIsTranscribing(true)
             const formData = new FormData()
@@ -53,23 +46,16 @@ export function Chatbot() {
 
             const response = await fetch("/api/transcribe", {
                 method: "POST",
-                body: formData,
+                body: formData
             })
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}))
-                throw new Error(errorData.error || `HTTP ${response.status}: Failed to transcribe audio`)
+                throw new Error(`HTTP ${response.status}`)
             }
 
             const data = await response.json()
-
-            // Handle the new API response format
-            if (data.success === false) {
-                throw new Error(data.error || "Transcription failed")
-            }
-
-            // Return the transcribed text instead of sending it automatically
-            return data.text && data.text.trim() ? data.text : ""
+            if (!data.success) throw new Error(data.error || "Transcription failed")
+            return data.text?.trim() || ""
         } catch (error) {
             console.error("Transcription error:", error)
             return ""
@@ -78,87 +64,71 @@ export function Chatbot() {
         }
     }
 
-    const handleSendTextMessage = useCallback(() => {
+    // Send text message
+    const sendTextMessage = () => {
         if (message.trim() && !isTranscribing) {
             handleSendMessage(message.trim())
             setMessage("")
         }
-    }, [message, handleSendMessage, isTranscribing])
+    }
 
-    const handleKeyPress = useCallback(
-        (e: React.KeyboardEvent) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault()
-                handleSendTextMessage()
-            }
-        },
-        [handleSendTextMessage]
-    )
+    // Handle Enter key press
+    const handleKeyPress = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault()
+            sendTextMessage()
+        }
+    }
 
-    const startRecording = useCallback(async () => {
+    // Start voice recording
+    const startRecording = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
             const mediaRecorder = new MediaRecorder(stream)
-
             mediaRecorderRef.current = mediaRecorder
             chunksRef.current = []
 
+            // Collect audio data chunks
             mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    chunksRef.current.push(event.data)
-                }
+                if (event.data.size > 0) chunksRef.current.push(event.data)
             }
 
+            // Process recording when stopped
             mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" })
-
-                try {
-                    const transcribedText = await handleAudioTranscribe(audioBlob)
-                    if (transcribedText && transcribedText.trim()) {
-                        setMessage(transcribedText)
-                    }
-                } catch (error) {
-                    console.error("Error during transcription:", error)
-                }
-
-                // Stop all tracks to release microphone
+                const text = await transcribeAudio(audioBlob)
+                if (text) setMessage(text)
                 stream.getTracks().forEach(track => track.stop())
             }
 
             mediaRecorder.start()
-            setIsRecordingState(true)
+            setIsRecording(true)
         } catch (error) {
-            console.error("Error starting recording:", error)
+            console.error("Recording error:", error)
             alert("Could not access microphone. Please check permissions.")
         }
-    }, [handleAudioTranscribe])
+    }
 
-    const stopRecording = useCallback(() => {
-        if (mediaRecorderRef.current && isRecordingState) {
+    // Stop voice recording
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
             mediaRecorderRef.current.stop()
-            setIsRecordingState(false)
+            setIsRecording(false)
         }
-    }, [isRecordingState])
+    }
 
-    const handleMicClick = useCallback(() => {
+    // Toggle recording state
+    const toggleRecording = () => {
         if (isTranscribing) return
+        isRecording ? stopRecording() : startRecording()
+    }
 
-        if (isRecordingState) {
-            stopRecording()
-        } else {
-            startRecording()
-        }
-    }, [isRecordingState, startRecording, stopRecording, isTranscribing])    // Chat Bubble Component
+    // Chat bubble component
     const ChatBubble = ({ message, isUser }: { message: string; isUser: boolean }) => (
         <div className={cn("flex w-full", isUser ? "justify-end" : "justify-start")}>
-            <div
-                className={cn(
-                    "max-w-[80%] rounded-full px-4 py-3 text-sm shadow-sm",
-                    isUser
-                        ? "bg-blue-500 text-white"
-                        : "bg-gray-100 text-gray-900 border border-gray-200"
-                )}
-            >
+            <div className={cn(
+                "max-w-[80%] rounded-full px-4 py-3 text-sm shadow-sm",
+                isUser ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-900 border border-gray-200")}>
                 <p className="whitespace-pre-wrap leading-relaxed">{message}</p>
             </div>
         </div>
@@ -166,64 +136,59 @@ export function Chatbot() {
 
     return (
         <div className="flex flex-col h-full bg-background">
-            {/* Messages Area - Scrollable */}
+            {/* Messages container */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {messages.map((msg) => (
-                    <ChatBubble
-                        key={msg.id}
-                        message={msg.text}
-                        isUser={msg.isUser}
-                    />
+                    <ChatBubble key={msg.id} message={msg.text} isUser={msg.isUser} />
                 ))}
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Area - Fixed */}
+            {/* Input area */}
             <div className="flex-shrink-0 relative flex items-center gap-2 p-4 border-t bg-background">
                 <div className="flex-1 flex items-center gap-2">
+                    {/* Text input */}
                     <Input
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         onKeyPress={handleKeyPress}
                         placeholder={
-                            isRecordingState
-                                ? "Recording... Click the mic to stop"
-                                : isTranscribing
-                                    ? "Processing your voice..."
+                            isRecording ? "Recording... Click mic to stop"
+                                : isTranscribing ? "Processing your voice..."
                                     : "Ask anything..."
                         }
-                        disabled={isRecording || isTranscribing}
+                        disabled={isTranscribing}
                         className="flex-1"
                     />
+
+                    {/* Voice recording button */}
                     <Button
                         size="icon"
                         variant="outline"
-                        onClick={handleMicClick}
+                        onClick={toggleRecording}
                         disabled={isTranscribing}
                         className={cn(
                             "transition-all duration-200",
-                            (isRecordingState || isRecording) && "bg-red-500 text-white hover:bg-red-600 border-red-500 animate-pulse",
+                            isRecording && "bg-red-500 text-white hover:bg-red-600 hover:text-white border-red-500 animate-pulse",
                             isTranscribing && "opacity-50",
-                            !isRecordingState && !isRecording && "hover:bg-gray-100"
+                            !isRecording && "text-gray-900 hover:bg-gray-100"
                         )}
                     >
-                        {isRecordingState || isRecording ? (
-                            <MicOff className="h-4 w-4 text-white" />
-                        ) : (
-                            <Mic className="h-4 w-4 text-gray-600" />
-                        )}
+                        {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                     </Button>
+
+                    {/* Send button */}
                     <Button
                         size="icon"
-                        onClick={handleSendTextMessage}
-                        disabled={!message.trim() || isRecording || isTranscribing}
+                        onClick={sendTextMessage}
+                        disabled={!message.trim() || isTranscribing}
                     >
                         <Send className="h-4 w-4" />
                     </Button>
                 </div>
 
                 {/* Recording indicator */}
-                {(isRecordingState || isRecording) && (
+                {isRecording && (
                     <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-3 py-1 rounded-full text-sm">
                         <div className="flex items-center gap-2">
                             <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
