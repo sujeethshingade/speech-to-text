@@ -8,9 +8,9 @@ import { cn } from "@/lib/utils"
 
 interface ChatInputProps {
     onSendMessage: (message: string) => void
-    onAudioTranscribe: (audioBlob: Blob) => void
+    onAudioTranscribe: (audioBlob: Blob) => Promise<string>
     isRecording: boolean
-    isTranscribing: boolean
+    isTranscribing?: boolean
     disabled?: boolean
 }
 
@@ -57,9 +57,17 @@ export function ChatInput({
                 }
             }
 
-            mediaRecorder.onstop = () => {
+            mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" })
-                onAudioTranscribe(audioBlob) // This calls the handleAudioTranscribe function
+
+                try {
+                    const transcribedText = await onAudioTranscribe(audioBlob)
+                    if (transcribedText && transcribedText.trim()) {
+                        setMessage(transcribedText)
+                    }
+                } catch (error) {
+                    console.error("Error during transcription:", error)
+                }
 
                 // Stop all tracks to release microphone
                 stream.getTracks().forEach(track => track.stop())
@@ -102,29 +110,26 @@ export function ChatInput({
                             ? "Recording... Click the mic to stop"
                             : isTranscribing
                                 ? "Processing your voice..."
-                                : "Type a message or click the mic to record..."
+                                : "Ask anything..."
                     }
                     disabled={disabled || isRecording || isTranscribing}
                     className="flex-1"
-                />
-                <Button
+                />                <Button
                     size="icon"
                     variant="outline"
                     onClick={handleMicClick}
                     disabled={disabled || isTranscribing}
                     className={cn(
                         "transition-all duration-200",
-                        (isRecordingState || isRecording) && "bg-red-500 text-white hover:bg-red-600 animate-pulse",
-                        isTranscribing && "opacity-50"
+                        (isRecordingState || isRecording) && "bg-red-500 text-white hover:bg-red-600 border-red-500 animate-pulse",
+                        isTranscribing && "opacity-50",
+                        !isRecordingState && !isRecording && "hover:bg-gray-100"
                     )}
                 >
                     {isRecordingState || isRecording ? (
-                        <div className="relative">
-                            <MicOff className="h-4 w-4" />
-                            <div className="absolute -inset-1 bg-red-500 rounded-full animate-ping opacity-75"></div>
-                        </div>
+                        <MicOff className="h-4 w-4 text-white" />
                     ) : (
-                        <Mic className="h-4 w-4" />
+                        <Mic className="h-4 w-4 text-gray-600" />
                     )}
                 </Button>
                 <Button
@@ -138,7 +143,7 @@ export function ChatInput({
 
             {/* Recording indicator */}
             {(isRecordingState || isRecording) && (
-                <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-3 py-1 rounded-full text-sm animate-bounce">
+                <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-3 py-1 rounded-full text-sm">
                     <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
                         Recording...
