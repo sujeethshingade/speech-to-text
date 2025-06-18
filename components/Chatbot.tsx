@@ -5,9 +5,20 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Mic, MicOff, Send } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Message } from "@/lib/types"
 
-export function Chatbot() {
+interface Message {
+    id: string
+    text: string
+    isUser: boolean
+}
+
+type TranscriptionMethod = 'local' | 'api'
+
+interface ChatbotProps {
+    transcriptionMethod?: TranscriptionMethod
+}
+
+export function Chatbot({ transcriptionMethod = 'local' }: ChatbotProps) {
     const [messages, setMessages] = useState<Message[]>([])
     const [isRecording, setIsRecording] = useState(false)
     const [isTranscribing, setIsTranscribing] = useState(false)
@@ -35,16 +46,22 @@ export function Chatbot() {
             }
             setMessages(prev => [...prev, aiResponse])
         }, 1000)
-    }
-
-    // Send audio to backend for transcription
+    }    // Send audio to backend for transcription
     const transcribeAudio = async (audioBlob: Blob) => {
         try {
             setIsTranscribing(true)
             const formData = new FormData()
-            formData.append("audio", audioBlob, "recording.webm")
+            formData.append("audio", audioBlob, "recording.webm")            // Add model parameter for OpenAI API (use default gpt-4o-transcribe)
+            if (transcriptionMethod === 'api') {
+                formData.append("model", "gpt-4o-transcribe")
+            }
 
-            const response = await fetch("/api/transcribe", {
+            // Choose endpoint based on transcription method
+            const endpoint = transcriptionMethod === 'local'
+                ? "/api/transcribe-local"
+                : "/api/transcribe-api"
+
+            const response = await fetch(endpoint, {
                 method: "POST",
                 body: formData
             })
@@ -121,9 +138,7 @@ export function Chatbot() {
     const toggleRecording = () => {
         if (isTranscribing) return
         isRecording ? stopRecording() : startRecording()
-    }
-
-    // Chat bubble component
+    }    // Chat bubble component
     const ChatBubble = ({ message, isUser }: { message: string; isUser: boolean }) => (
         <div className={cn("flex w-full", isUser ? "justify-end" : "justify-start")}>
             <div className={cn(
@@ -132,7 +147,8 @@ export function Chatbot() {
                 <p className="whitespace-pre-wrap leading-relaxed">{message}</p>
             </div>
         </div>
-    )
+    )    // Transcription method dropdown (moved to navbar)
+    // const TranscriptionDropdown = () => (...)
 
     return (
         <div className="flex flex-col h-full bg-background">
@@ -142,10 +158,7 @@ export function Chatbot() {
                     <ChatBubble key={msg.id} message={msg.text} isUser={msg.isUser} />
                 ))}
                 <div ref={messagesEndRef} />
-            </div>
-
-            {/* Input area */}
-            <div className="flex-shrink-0 relative flex items-center gap-2 p-4 border-t bg-background">
+            </div>            {/* Input area */}            <div className="flex-shrink-0 relative flex items-center gap-2 p-4 border-t bg-background">
                 <div className="flex-1 flex items-center gap-2">
                     {/* Text input */}
                     <Input
@@ -154,7 +167,7 @@ export function Chatbot() {
                         onKeyPress={handleKeyPress}
                         placeholder={
                             isRecording ? "Recording... Click mic to stop"
-                                : isTranscribing ? "Processing your voice..."
+                                : isTranscribing ? `Processing with ${transcriptionMethod === 'local' ? 'Local Whisper' : 'OpenAI API'}...`
                                     : "Ask anything..."
                         }
                         disabled={isTranscribing}
