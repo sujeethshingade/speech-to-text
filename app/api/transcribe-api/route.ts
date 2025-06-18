@@ -5,10 +5,10 @@ import { join } from 'path'
 
 export async function POST(request: NextRequest) {
   let tempFilePath: string | null = null
-  
-  try {
+    try {
     const formData = await request.formData()
     const audioFile = formData.get('audio') as File
+    const model = formData.get('model') as string || 'whisper-1'
 
     if (!audioFile) {
       return NextResponse.json({ error: 'No audio file provided', success: false }, { status: 400 })
@@ -29,24 +29,11 @@ export async function POST(request: NextRequest) {
     
     writeFileSync(tempFilePath, new Uint8Array(await audioFile.arrayBuffer()))
 
-    let transcription
-    const primaryModel = 'gpt-4o-transcribe'
-    const fallbackModel = 'gpt-4o-mini-transcribe'
-
-    try {
-      transcription = await openai.audio.transcriptions.create({
-        file: createReadStream(tempFilePath),
-        model: primaryModel as any,
-        response_format: "text",
-      })
-    } catch (primaryError) {
-      console.log(`Primary model ${primaryModel} failed, trying fallback ${fallbackModel}`)
-      transcription = await openai.audio.transcriptions.create({
-        file: createReadStream(tempFilePath),
-        model: fallbackModel as any,
-        response_format: "text",
-      })
-    }
+    const transcription = await openai.audio.transcriptions.create({
+      file: createReadStream(tempFilePath),
+      model: model,
+      response_format: "text",
+    })
 
     const text = typeof transcription === 'string' ? transcription.trim() : (transcription as any).text?.trim() || ''
     return NextResponse.json({ text, success: true })

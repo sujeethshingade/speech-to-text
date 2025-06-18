@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Mic, MicOff, Send } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+type ModelType = 'whisper-1' | 'gpt-4o-transcribe' | 'gpt-4o-mini-transcribe'
+
 interface Message {
     id: string
     text: string
@@ -14,9 +16,10 @@ interface Message {
 
 interface ChatbotProps {
     transcriptionMethod?: 'local' | 'api'
+    selectedModel?: ModelType
 }
 
-export function Chatbot({ transcriptionMethod = 'local' }: ChatbotProps) {
+export function Chatbot({ transcriptionMethod = 'local', selectedModel = 'whisper-1' }: ChatbotProps) {
     const [messages, setMessages] = useState<Message[]>([])
     const [isRecording, setIsRecording] = useState(false)
     const [isTranscribing, setIsTranscribing] = useState(false)
@@ -43,6 +46,7 @@ export function Chatbot({ transcriptionMethod = 'local' }: ChatbotProps) {
         try {
             const formData = new FormData()
             formData.append("audio", audioBlob, "recording.webm")
+            formData.append("model", selectedModel)
 
             const response = await fetch(`/api/transcribe-${transcriptionMethod}`, {
                 method: "POST",
@@ -106,7 +110,7 @@ export function Chatbot({ transcriptionMethod = 'local' }: ChatbotProps) {
     }
 
     const placeholder = isRecording ? "Recording... Click on mic to stop" :
-        isTranscribing ? `Processing with ${transcriptionMethod === 'local' ? 'Local' : 'API'}...` :
+        isTranscribing ? `Processing with ${transcriptionMethod === 'local' ? 'Local' : `${selectedModel} API`}...` :
             "Ask anything..."
 
     return (
