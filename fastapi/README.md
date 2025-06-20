@@ -1,96 +1,111 @@
-# FastAPI Speech-to-Text Backend
+# FastAPI Speech-to-Text API
 
-A standalone FastAPI application for speech-to-text functionality using OpenAI's Whisper AI model, optimized for GPT-4o-mini compatibility. This runs completely independently with its own web interface.
+A simplified FastAPI application for speech-to-text transcription using OpenAI's Whisper AI model. Clean, optimized, and ready to use.
 
-## Features
+## ✨ Features
 
-- **Whisper AI Transcription**: High-quality transcription using OpenAI's advanced Whisper-1 model
-- **GPT-4o-mini Compatible**: Optimized workflow for seamless integration
-- **Standalone Web Interface**: Built-in HTML/JavaScript frontend with modern UI
-- **Real-time Audio**: Record audio directly from the browser
-- **Multi-format Support**: MP3, MP4, WAV, WebM, OGG, M4A, MPGA, MPEG
-- **Self-contained**: No external dependencies or services required
-- **Enhanced Error Handling**: Comprehensive error handling and logging
+- **OpenAI Whisper Integration**: High-quality transcription using `whisper-1` model
+- **Simple Web Interface**: Drag & drop files or record directly in browser  
+- **Multiple Audio Formats**: MP3, WAV, M4A, WebM, OGG, FLAC, AMR support
+- **Real-time Recording**: Record audio directly from microphone
+- **Optimized Code**: Minimal, clean codebase under 100 lines
+- **Easy Setup**: One-click setup with batch file
 
-## Quick Start
+## 🚀 Quick Start
 
-**Option 1: Using the setup script (Windows)**
-
+**Windows (Recommended)**
 ```bash
 start.bat
 ```
 
-**Option 2: Manual setup**
+**Manual Setup**
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-1. **Install Dependencies**:
+# Set up environment
+echo OPENAI_API_KEY=your_api_key_here > .env
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+# Run the application  
+python main.py
+```
 
-2. **Environment Configuration**:
+**Access**: Open <http://localhost:8000>
 
-   ```bash
-   copy .env.example .env
-   # Edit .env and add your OpenAI API key
-   ```
+## 📁 Project Structure
 
-3. **Start the Application**:
+```
+fastapi/
+├── main.py           # Main FastAPI application (75 lines)
+├── requirements.txt  # Dependencies (5 packages)
+├── start.bat        # Windows setup script
+├── .env             # Environment variables
+└── static/
+    └── index.html   # Single-file web interface
+```
 
-   ```bash
-   python main.py
-   ```
+## 🔧 API Endpoints
 
-4. **Access the Application**:
+| Method | Endpoint          | Description           |
+| ------ | ----------------- | --------------------- |
+| `GET`  | `/`               | Web interface         |
+| `POST` | `/api/transcribe` | Transcribe audio file |
+| `GET`  | `/api/models`     | Available models info |
+| `GET`  | `/health`         | Service health check  |
 
-   Open your browser and go to: <http://localhost:8000>
+## 📋 Requirements
 
-### API Endpoints
+- Python 3.8+
+- OpenAI API key
+- Modern web browser (for recording)
 
-#### Whisper AI Transcription
+## 🎯 Usage
 
-- **POST** `/api/transcribe`
-- Uses OpenAI's Whisper-1 model for transcription  
-- Optimized for GPT-4o-mini workflow compatibility
-- Requires OpenAI API key
+1. **File Upload**: Drag & drop audio files or click to select
+2. **Recording**: Click microphone button to record audio
+3. **Transcription**: Automatic transcription with real-time results
 
-#### Model Information
+## 🔧 Configuration
 
-- **GET** `/api/models`
-- Returns available transcription models and supported formats
+Edit `.env` file:
+```env
+OPENAI_API_KEY=your_openai_api_key_here
+```
 
-#### Health Check
+## 📊 Specifications
 
-- **GET** `/health`
-- Returns service status and OpenAI connectivity
+- **Max File Size**: 25MB
+- **Supported Formats**: MP3, WAV, M4A, WebM, OGG, FLAC, AMR
+- **Model**: OpenAI Whisper-1
+- **Response Time**: ~2-5 seconds per minute of audio
 
-## File Upload Limits
+## 🚀 Deployment
 
-- Maximum file size: 25MB
-- Supported formats: MP3, MP4, WAV, WebM, OGG, M4A, MPGA, MPEG
-- Auto language detection supported
+**Development**
+```bash
+python main.py
+```
 
-## Error Resolution
-
-### Fixed Issues
-
-- ✅ **ThreadMessage import error**: Resolved by upgrading to OpenAI client v1.51.2
-- ✅ **Improved error handling**: Better validation and user feedback
-- ✅ **Performance optimizations**: Singleton client pattern and efficient file handling
-
-## Development
-
-The server runs with auto-reload enabled by default. Make changes to the code and the server will automatically restart.
-
-For production deployment, consider using:
-
+**Production**
 ```bash
 uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
-## Dependencies
+## 🔍 Troubleshooting
 
-- FastAPI: Web framework
-- Uvicorn: ASGI server  
-- OpenAI API: Cloud speech recognition
-- Python-multipart: File upload support
+**OpenAI Import Error**: Update OpenAI package
+```bash
+pip install --upgrade openai==1.3.8
+```
+
+**Audio Format Error**: Ensure file extension matches audio format
+
+**Microphone Access**: Use HTTPS in production for microphone access
+
+## 📦 Dependencies
+
+- `fastapi` - Web framework
+- `uvicorn` - ASGI server
+- `openai` - OpenAI API client
+- `python-multipart` - File upload support
+- `python-dotenv` - Environment management
