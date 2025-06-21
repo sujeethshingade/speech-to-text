@@ -1,5 +1,4 @@
 from fastapi import FastAPI, File, UploadFile
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import openai
@@ -16,7 +15,6 @@ AUDIO_EXTENSIONS = {'mp3', 'wav', 'ogg', 'webm', 'm4a', 'mp4', 'flac', 'amr'}
 app = FastAPI(title="Speech-to-Text Chatbot")
 app.add_middleware(CORSMiddleware, allow_origins=[
                    "*"], allow_methods=["*"], allow_headers=["*"])
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 class TranscriptionResponse(BaseModel):
@@ -30,7 +28,7 @@ client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    with open("static/index.html", "r", encoding="utf-8") as f:
+    with open("chatbot.html", "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
 
