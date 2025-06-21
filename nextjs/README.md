@@ -116,7 +116,7 @@ For more details about the different models, view [Whisper](https://platform.ope
 
 ```bash
 git clone https://github.com/sujeethshingade/speech-to-text.git
-cd speech-to-text
+cd speech-to-text/nextjs
 ```
 
 ### 2. Set up Virtual Environment
