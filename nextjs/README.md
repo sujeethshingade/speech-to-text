@@ -110,6 +110,38 @@ For more details about the different models, view [Whisper](https://platform.ope
 - If there's existing text, new text is appended with a space
 - You can edit the text before sending
 
+## Evaluation Metrics
+
+These values are based on 25 WAV files (each containing approximately 40 seconds of English speech) that were transcribed using these models.
+
+```mermaid
+flowchart LR
+
+    subgraph GPT-4o-transcribe
+        T1["97.5%<br/>Avg Accuracy"]
+        T2["2.5%<br/>Avg WER"]
+        T3["3032ms<br/>Avg Latency"]
+        T4["98.9%<br/>Best Case"]
+        T5["86.4%<br/>Worst Case"]
+    end
+
+    subgraph GPT-4o-mini-transcribe
+        M1["96.8%<br/>Avg Accuracy"]
+        M2["3.2%<br/>Avg WER"]
+        M3["2499ms<br/>Avg Latency"]
+        M4["98.9%<br/>Best Case"]
+        M5["86.4%<br/>Worst Case"]
+    end
+
+    subgraph whisper-1
+        W1["95.6%<br/>Avg Accuracy"]
+        W2["4.4%<br/>Avg WER"]
+        W3["2780ms<br/>Avg Latency"]
+        W4["96.9%<br/>Best Case"]
+        W5["86.4%<br/>Worst Case"]
+    end
+```
+
 ## Installation
 
 ### 1. Clone the Repository
