@@ -24,7 +24,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_REALTIME_URL = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview"
 
 if not OPENAI_API_KEY:
-    logger.error("⚠️  OPENAI_API_KEY environment variable not set!")
+    logger.error("⚠️ OPENAI_API_KEY environment variable not set")
 else:
     logger.info("✅ OpenAI API key loaded successfully")
 
@@ -36,7 +36,6 @@ class RealtimeConnection:
         self.is_connected = False
 
     async def connect_to_openai(self):
-        """Connect to OpenAI Realtime API and configure session"""
         try:
             logger.info("🔄 Connecting to OpenAI Realtime API...")
 
@@ -81,19 +80,22 @@ class RealtimeConnection:
 
             if response_data.get("type") == "session.created":
                 logger.info("✅ Session created successfully")
+
             elif response_data.get("type") == "error":
                 error_msg = response_data.get("error", {}).get(
                     "message", "Unknown error")
                 logger.error(f"❌ Session creation failed: {error_msg}")
                 raise Exception(f"Session creation failed: {error_msg}")
+
             else:
                 logger.warning(
-                    f"⚠️  Unexpected session response: {response_data.get('type')}")
+                    f"⚠️ Unexpected session response: {response_data.get('type')}")
 
         except asyncio.TimeoutError:
             logger.error("⏰ Timeout waiting for session creation")
             self.is_connected = False
             raise Exception("Timeout waiting for session creation")
+
         except Exception as e:
             logger.error(f"❌ Failed to connect to OpenAI: {e}")
             self.is_connected = False
@@ -102,6 +104,7 @@ class RealtimeConnection:
     async def handle_openai_messages(self):
         try:
             logger.info("📥 Starting OpenAI message handler")
+
             while self.is_connected and self.openai_ws:
                 message = await self.openai_ws.recv()
                 data = json.loads(message)
@@ -110,12 +113,14 @@ class RealtimeConnection:
 
                 if event_type in ["session.created", "session.updated", "conversation.item.created"]:
                     logger.info(f"📨 OpenAI event: {event_type}")
+
                 elif event_type == "error":
                     error_data = data.get("error", {})
                     error_msg = error_data.get("message", "Unknown error")
                     error_code = error_data.get("code", "unknown")
 
-                    logger.error(f"❌ OpenAI API error [{error_code}]: {error_msg}")
+                    logger.error(
+                        f"❌ OpenAI API error [{error_code}]: {error_msg}")
 
                 elif event_type in ["input_audio_buffer.speech_started", "input_audio_buffer.speech_stopped"]:
                     logger.debug(f"🎤 Speech event: {event_type}")
@@ -125,35 +130,31 @@ class RealtimeConnection:
         except websockets.exceptions.ConnectionClosed:
             logger.info("🔌 OpenAI connection closed")
             self.is_connected = False
+
         except Exception as e:
             logger.error(f"❌ Error handling OpenAI messages: {e}")
             self.is_connected = False
 
     async def send_to_openai(self, message: dict):
         if not self.is_connected or not self.openai_ws:
-            logger.warning("⚠️  Cannot send message: not connected to OpenAI")
+            logger.warning("⚠️ Cannot send message: not connected to OpenAI")
             return
 
         try:
             msg_type = message.get("type")
-            
+
             if msg_type == "input_audio_buffer.append":
                 audio_data = message.get("audio", "")
                 if not audio_data or len(audio_data) == 0:
-                    logger.warning("⚠️  Skipping empty audio buffer")
+                    logger.warning("⚠️ Skipping empty audio buffer")
                     return
 
-                if len(audio_data) < 500:
-                    logger.debug(f"⚠️  Small audio buffer ({len(audio_data)} chars), allowing")
-                
-                logger.debug(f"🎤 Sending audio chunk: {len(audio_data)} chars")
-
             await self.openai_ws.send(json.dumps(message))
-            
+
         except Exception as e:
             logger.error(f"❌ Error sending to OpenAI: {e}")
             if "buffer too small" in str(e).lower():
-                logger.warning("⚠️  Audio buffer error - continuing connection")
+                logger.warning("⚠️ Audio buffer error - continuing connection")
                 # Send error back to client
                 await self.client_ws.send_text(json.dumps({
                     "type": "error",
@@ -202,15 +203,17 @@ async def websocket_endpoint(websocket: WebSocket):
                 await connection.send_to_openai(message)
 
             except WebSocketDisconnect:
-                logger.info("👋 Client disconnected")
+                logger.info("🔌Client disconnected")
                 break
+
             except json.JSONDecodeError as e:
                 logger.error(f"❌ Invalid JSON from client: {e}")
                 continue
+
             except Exception as e:
                 logger.error(f"❌ Error handling client message: {e}")
                 if "buffer too small" in str(e).lower():
-                    logger.warning("⚠️  Audio buffer error - continuing")
+                    logger.warning("⚠️ Audio buffer error - continuing")
                     continue
                 break
 
@@ -218,17 +221,14 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.error(f"❌ WebSocket error: {e}")
         error_message = str(e)
 
-        # Simplify turn detection error message
-        if "turn_detection" in error_message:
-            error_message = "Turn detection configuration error. Please check server logs."
-
         try:
             await websocket.send_text(json.dumps({
                 "type": "error",
                 "error": {"message": f"Connection error: {error_message}"}
             }))
+
         except:
-            logger.warning("⚠️  Could not send error message to client")
+            logger.warning("⚠️ Could not send error message to client")
 
     finally:
         if openai_task:
