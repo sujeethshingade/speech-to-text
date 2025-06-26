@@ -2,8 +2,6 @@
 
 A FastAPI application for speech-to-text transcription using OpenAI's advanced transcription models.
 
-🌐 **Live Demo**: [Deployed on Render](https://speech-to-text-r22a.onrender.com)
-
 ## How It Works?
 
 ### 1. Frontend Interface (`chatbot.html`)
@@ -52,7 +50,7 @@ A FastAPI application for speech-to-text transcription using OpenAI's advanced t
 ```bash
 # Clone the repository
 git clone https://github.com/sujeethshingade/speech-to-text.git
-cd speech-to-text/fastapi
+cd speech-to-text/fastapi/transcribe
 
 # Create virtual environment
 python -m venv venv
