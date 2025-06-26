@@ -51,7 +51,7 @@ class RealtimeConnection:
             self.is_connected = True
             logger.info("✅ Connected to OpenAI Realtime API")
 
-            # Simplified session configuration
+            # Session configuration
             session_config = {
                 "type": "session.update",
                 "session": {
@@ -63,9 +63,9 @@ class RealtimeConnection:
                     "input_audio_transcription": {"model": "gpt-4o-mini-transcribe"},
                     "turn_detection": {
                         "type": "server_vad",
-                        "threshold": 0.7,
+                        "threshold": 0.5,
                         "prefix_padding_ms": 300,
-                        "silence_duration_ms": 1000
+                        "silence_duration_ms": 500
                     },
                     "temperature": 0.7,
                     "max_response_output_tokens": 4096
@@ -107,13 +107,18 @@ class RealtimeConnection:
                 data = json.loads(message)
 
                 event_type = data.get("type")
-                if event_type in ["session.created", "error", "session.updated"]:
-                    logger.info(f"📨 OpenAI event: {event_type}")
 
-                if event_type == "error":
-                    error_msg = data.get("error", {}).get(
-                        "message", "Unknown error")
-                    logger.error(f"❌ OpenAI API error: {error_msg}")
+                if event_type in ["session.created", "session.updated", "conversation.item.created"]:
+                    logger.info(f"📨 OpenAI event: {event_type}")
+                elif event_type == "error":
+                    error_data = data.get("error", {})
+                    error_msg = error_data.get("message", "Unknown error")
+                    error_code = error_data.get("code", "unknown")
+
+                    logger.error(f"❌ OpenAI API error [{error_code}]: {error_msg}")
+
+                elif event_type in ["input_audio_buffer.speech_started", "input_audio_buffer.speech_stopped"]:
+                    logger.debug(f"🎤 Speech event: {event_type}")
 
                 await self.client_ws.send_text(json.dumps(data))
 
@@ -125,13 +130,35 @@ class RealtimeConnection:
             self.is_connected = False
 
     async def send_to_openai(self, message: dict):
-        if self.is_connected and self.openai_ws:
-            try:
-                await self.openai_ws.send(json.dumps(message))
-                logger.debug(
-                    f"📤 Sent to OpenAI: {message.get('type', 'unknown')}")
-            except Exception as e:
-                logger.error(f"❌ Error sending to OpenAI: {e}")
+        if not self.is_connected or not self.openai_ws:
+            logger.warning("⚠️  Cannot send message: not connected to OpenAI")
+            return
+
+        try:
+            msg_type = message.get("type")
+            
+            if msg_type == "input_audio_buffer.append":
+                audio_data = message.get("audio", "")
+                if not audio_data or len(audio_data) == 0:
+                    logger.warning("⚠️  Skipping empty audio buffer")
+                    return
+
+                if len(audio_data) < 500:
+                    logger.debug(f"⚠️  Small audio buffer ({len(audio_data)} chars), allowing")
+                
+                logger.debug(f"🎤 Sending audio chunk: {len(audio_data)} chars")
+
+            await self.openai_ws.send(json.dumps(message))
+            
+        except Exception as e:
+            logger.error(f"❌ Error sending to OpenAI: {e}")
+            if "buffer too small" in str(e).lower():
+                logger.warning("⚠️  Audio buffer error - continuing connection")
+                # Send error back to client
+                await self.client_ws.send_text(json.dumps({
+                    "type": "error",
+                    "error": {"message": "Audio buffer too small. Please record longer."}
+                }))
 
     async def close(self):
         self.is_connected = False
@@ -177,8 +204,14 @@ async def websocket_endpoint(websocket: WebSocket):
             except WebSocketDisconnect:
                 logger.info("👋 Client disconnected")
                 break
+            except json.JSONDecodeError as e:
+                logger.error(f"❌ Invalid JSON from client: {e}")
+                continue
             except Exception as e:
                 logger.error(f"❌ Error handling client message: {e}")
+                if "buffer too small" in str(e).lower():
+                    logger.warning("⚠️  Audio buffer error - continuing")
+                    continue
                 break
 
     except Exception as e:

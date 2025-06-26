@@ -408,9 +408,11 @@
       let messageId = 0;
       let currentConversationId = null;
       let recordingStartTime = null;
-      let minRecordingDuration = 100;
+      let minRecordingDuration = 1000; 
       let audioBatchBuffer = [];
       let batchTimeout = null;
+      let audioBufferSize = 0; 
+      let isBufferCommitted = false;
 
       const messages = document.getElementById("messages");
       const messageInput = document.getElementById("messageInput");
@@ -454,6 +456,8 @@
         ws.onclose = function () {
           console.log("Disconnected from server");
           isConnected = false;
+          audioBufferSize = 0;
+          isBufferCommitted = false;
 
           if (batchTimeout) {
             clearTimeout(batchTimeout);
@@ -476,6 +480,8 @@
           case "session.created":
             console.log("Session created:", data.session.id);
             currentConversationId = data.session.id;
+            audioBufferSize = 0;
+            isBufferCommitted = false;
             break;
 
           case "conversation.item.created":
@@ -518,6 +524,8 @@
           case "input_audio_buffer.committed":
             console.log("Audio buffer committed");
             setTranscribing(false);
+            audioBufferSize = 0; 
+            isBufferCommitted = true;
             break;
 
           case "conversation.item.input_audio_transcription.completed":
@@ -705,13 +713,17 @@
 
       async function startRecording() {
         try {
+          audioBufferSize = 0;
+          isBufferCommitted = false;
+          audioBatchBuffer = [];
+
           const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
               sampleRate: 24000,
               channelCount: 1,
               echoCancellation: true,
               noiseSuppression: true,
-              autoGainControl: false,
+              autoGainControl: true,
               latency: 0,
             },
           });
@@ -723,9 +735,10 @@
           );
 
           const source = audioContext.createMediaStreamSource(stream);
-          const processor = audioContext.createScriptProcessor(2048, 1, 1);
+          const processor = audioContext.createScriptProcessor(4096, 1, 1);
 
           recordingStartTime = Date.now();
+          let audioBuffer = []; 
 
           processor.onaudioprocess = function (e) {
             if (!isRecording) return;
@@ -734,23 +747,49 @@
             const pcmData = new Int16Array(inputData.length);
 
             for (let i = 0; i < inputData.length; i++) {
-              pcmData[i] = Math.max(
-                -32768,
-                Math.min(32767, inputData[i] * 32768)
-              );
+              const s = Math.max(-1, Math.min(1, inputData[i]));
+              pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
             }
 
-            const base64Audio = btoa(
-              String.fromCharCode(...new Uint8Array(pcmData.buffer))
-            );
+            audioBuffer.push(pcmData);
 
-            if (ws && ws.readyState === WebSocket.OPEN) {
-              ws.send(
-                JSON.stringify({
-                  type: "input_audio_buffer.append",
-                  audio: base64Audio,
-                })
+            const expectedChunksFor200ms = Math.ceil((24000 * 0.2) / 4096);
+
+            if (audioBuffer.length >= expectedChunksFor200ms) {
+              const totalLength = audioBuffer.reduce(
+                (sum, chunk) => sum + chunk.length,
+                0
               );
+              const combinedBuffer = new Int16Array(totalLength);
+              let offset = 0;
+
+              for (const chunk of audioBuffer) {
+                combinedBuffer.set(chunk, offset);
+                offset += chunk.length;
+              }
+
+              const base64Audio = btoa(
+                String.fromCharCode(...new Uint8Array(combinedBuffer.buffer))
+              );
+
+              if (
+                base64Audio.length > 1000 &&
+                ws &&
+                ws.readyState === WebSocket.OPEN
+              ) {
+                console.log(
+                  `Sending audio chunk: ${base64Audio.length} chars, ${combinedBuffer.length} samples`
+                );
+                ws.send(
+                  JSON.stringify({
+                    type: "input_audio_buffer.append",
+                    audio: base64Audio,
+                  })
+                );
+                audioBufferSize += base64Audio.length;
+              }
+
+              audioBuffer = [];
             }
           };
 
@@ -763,24 +802,38 @@
           window.audioProcessor = processor;
         } catch (error) {
           console.error("Recording error:", error);
+          addMessage(
+            "Error starting microphone: " + error.message,
+            false,
+            "error"
+          );
         }
       }
 
       async function stopRecording() {
         const recordingDuration = Date.now() - recordingStartTime;
+        console.log(
+          `Recording duration: ${recordingDuration}ms, buffer size: ${audioBufferSize} chars`
+        );
+
         if (recordingDuration < minRecordingDuration) {
           console.log(
             `Recording too short: ${recordingDuration}ms, minimum required: ${minRecordingDuration}ms`
+          );
+          addMessage(
+            `Recording too short. Please record for at least ${
+              minRecordingDuration / 1000
+            } seconds.`,
+            false,
+            "error"
           );
 
           if (window.audioStream) {
             window.audioStream.getTracks().forEach((track) => track.stop());
           }
-
           if (window.audioProcessor) {
             window.audioProcessor.disconnect();
           }
-
           if (audioContext) {
             await audioContext.close();
           }
@@ -789,23 +842,53 @@
           return;
         }
 
+        // Check for sufficient audio data
+        if (audioBufferSize < 5000) {
+          console.log(`Audio buffer too small: ${audioBufferSize} chars`);
+          addMessage(
+            "Audio buffer too small. Please speak longer.",
+            false,
+            "error"
+          );
+
+          if (window.audioStream) {
+            window.audioStream.getTracks().forEach((track) => track.stop());
+          }
+          if (window.audioProcessor) {
+            window.audioProcessor.disconnect();
+          }
+          if (audioContext) {
+            await audioContext.close();
+          }
+
+          setRecording(false);
+          return;
+        }
+
+        // Clean up audio resources
         if (window.audioStream) {
           window.audioStream.getTracks().forEach((track) => track.stop());
         }
-
         if (window.audioProcessor) {
           window.audioProcessor.disconnect();
         }
-
         if (audioContext) {
           await audioContext.close();
         }
 
-        ws.send(
-          JSON.stringify({
-            type: "input_audio_buffer.commit",
-          })
-        );
+        if (
+          ws &&
+          ws.readyState === WebSocket.OPEN &&
+          !isBufferCommitted &&
+          audioBufferSize > 0
+        ) {
+          console.log("Committing audio buffer...");
+          ws.send(
+            JSON.stringify({
+              type: "input_audio_buffer.commit",
+            })
+          );
+        }
 
         setRecording(false);
       }
