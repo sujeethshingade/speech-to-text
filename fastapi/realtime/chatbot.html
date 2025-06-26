@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Speech-to-Text Chatbot</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        background: #f8fafc;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Navbar */
+      .navbar {
+        background: white;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 12px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+
+      .navbar h1 {
+        color: #1e293b;
+        font-size: 16px;
+        font-weight: 600;
+      }
+      .tabs {
+        display: flex;
+        background: #f1f5f9;
+        border-radius: 50px;
+        padding: 2px;
+      }
+
+      .tab {
+        padding: 6px 12px;
+        border: none;
+        background: transparent;
+        border-radius: 50px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        color: #64748b;
+        transition: all 0.2s;
+      }
+
+      .tab.active {
+        background: #3b82f6;
+        color: white;
+      }
+
+      /* Chat Container */
+      .chat-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        background: white;
+        overflow: hidden;
+      }
+
+      /* Messages Area */
+      .messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-height: 400px;
+      }
+
+      .message {
+        display: flex;
+        width: 100%;
+        animation: fadeInUp 0.3s ease-out;
+      }
+
+      .message.user {
+        justify-content: flex-end;
+      }
+
+      .message.bot {
+        justify-content: flex-start;
+      }
+
+      .message-bubble {
+        padding: 8px 16px;
+        border-radius: 50px;
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 1.4;
+        word-wrap: break-word;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        max-width: 70%;
+        width: fit-content;
+      }
+
+      .message.user .message-bubble {
+        background: #3b82f6;
+        color: white;
+      }
+
+      .message.bot .message-bubble {
+        background: #f1f5f9;
+        color: #1f2937;
+        border: 1px solid #e2e8f0;
+      }
+
+      .message-bubble.system {
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fbbf24;
+      }
+
+      .message-bubble.error {
+        background: #fee2e2;
+        color: #dc2626;
+        border: 1px solid #fca5a5;
+      }
+
+      /* Input Area */
+      .input-area {
+        border-top: 1px solid #e2e8f0;
+        padding: 10px 12px;
+        background: white;
+        position: relative;
+      }
+
+      .input-container {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        position: relative;
+      }
+
+      .input-field {
+        flex: 1;
+        padding: 12px 16px;
+        border: 1px solid #e2e8f0;
+        border-radius: 50px;
+        font-size: 14px;
+        outline: none;
+        transition: all 0.2s;
+      }
+
+      .input-field:focus {
+        border-color: #000;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+
+      .input-field:disabled {
+        background: #f8fafc;
+        color: #94a3b8;
+      }
+
+      .btn {
+        width: 40px;
+        height: 40px;
+        border: 1px solid #e2e8f0;
+        border-radius: 50px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        transition: all 0.2s;
+        position: relative;
+        background: white;
+        color: #374151;
+      }
+
+      .btn:disabled {
+        opacity: 50%;
+        cursor: not-allowed;
+      }
+
+      .btn-record {
+        background: #ef4444;
+        color: white;
+        border-color: #ef4444;
+      }
+
+      .btn-record:hover:not(:disabled) {
+        background: #dc2626;
+        border-color: #dc2626;
+      }
+
+      .btn-record.recording {
+        background: #ef4444;
+        color: white;
+        border-color: #ef4444;
+        animation: pulse 1.5s infinite;
+      }
+
+      .btn-send {
+        background: #3b82f6;
+        color: white;
+        border-color: #3b82f6;
+      }
+
+      .btn-send:hover:not(:disabled) {
+        background: #2563eb;
+        border-color: #2563eb;
+      }
+
+      /* Recording Indicator */
+      .recording-indicator {
+        position: absolute;
+        top: -40px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #ef4444;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 50px;
+        font-size: 12px;
+        display: none;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .recording-indicator.active {
+        display: flex;
+      }
+
+      .recording-dot {
+        width: 8px;
+        height: 8px;
+        background: white;
+        border-radius: 50%;
+        animation: pulse 1s infinite;
+      }
+
+      /* Animations */
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.8;
+          transform: scale(0.95);
+        }
+      }
+
+      /* Fast response indicator */
+      .processing-indicator {
+        position: absolute;
+        top: -40px;
+        right: 10px;
+        background: #3b82f6;
+        color: white;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        display: none;
+        align-items: center;
+        gap: 6px;
+        animation: slideInFromRight 0.2s ease-out;
+      }
+
+      .processing-indicator.active {
+        display: flex;
+      }
+
+      .processing-dot {
+        width: 6px;
+        height: 6px;
+        background: white;
+        border-radius: 50%;
+        animation: pulse 0.8s infinite;
+      }
+
+      @keyframes slideInFromRight {
+        from {
+          opacity: 0;
+          transform: translateX(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+      @media (max-width: 768px) {
+        .chat-container {
+          margin: 0;
+          border-radius: 0;
+          height: 100vh;
+        }
+
+        .navbar {
+          padding: 10px 12px;
+        }
+
+        .messages {
+          padding: 10px;
+        }
+
+        .input-area {
+          padding: 8px 10px;
+        }
+
+        .message-bubble {
+          max-width: 85%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="navbar">
+      <h1>Speech-to-Text Chatbot</h1>
+      <div class="tabs">
+        <button class="tab active" data-model="gpt-4o-mini-transcribe">
+          GPT-4o mini Realtime
+        </button>
+      </div>
+    </div>
+
+    <div class="chat-container">
+      <div class="messages" id="messages"></div>
+      <div class="input-area">
+        <div class="recording-indicator" id="recordingIndicator">
+          <div class="recording-dot"></div>
+          Listening... Click mic to stop
+        </div>
+        <div class="processing-indicator" id="processingIndicator">
+          <div class="processing-dot"></div>
+          Processing...
+        </div>
+        <div class="input-container">
+          <input
+            type="text"
+            id="messageInput"
+            class="input-field"
+            placeholder="Ask anything..."
+            autocomplete="off"
+          />
+          <button class="btn btn-record" id="recordBtn" title="Record audio">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"
+              ></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
+              <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+          </button>
+          <button class="btn btn-send" id="sendBtn" title="Send message">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let ws = null;
+      let isConnected = false;
+      let isRecording = false;
+      let mediaRecorder = null;
+      let audioContext = null;
+      let audioChunks = [];
+      let selectedModel = "gpt-4o-mini-transcribe";
+      let messageId = 0;
+      let currentConversationId = null;
+      let recordingStartTime = null;
+      let minRecordingDuration = 100;
+      let audioBatchBuffer = [];
+      let batchTimeout = null;
+
+      const messages = document.getElementById("messages");
+      const messageInput = document.getElementById("messageInput");
+      const recordBtn = document.getElementById("recordBtn");
+      const sendBtn = document.getElementById("sendBtn");
+      const recordingIndicator = document.getElementById("recordingIndicator");
+      const processingIndicator = document.getElementById(
+        "processingIndicator"
+      );
+      const tabs = document.querySelectorAll(".tab");
+
+      document.addEventListener("DOMContentLoaded", function () {
+        messageInput.addEventListener("keydown", handleKeyDown);
+        sendBtn.addEventListener("click", sendTextMessage);
+        recordBtn.addEventListener("click", toggleRecording);
+
+        tabs.forEach((tab) => {
+          tab.addEventListener("click", () => selectModel(tab.dataset.model));
+        });
+
+        connectWebSocket();
+        checkBrowserSupport();
+      });
+
+      function connectWebSocket() {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${protocol}//${window.location.host}/ws/realtime`;
+
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = function () {
+          console.log("Connected to realtime server");
+          isConnected = true;
+        };
+
+        ws.onmessage = function (event) {
+          const data = JSON.parse(event.data);
+          handleRealtimeMessage(data);
+        };
+
+        ws.onclose = function () {
+          console.log("Disconnected from server");
+          isConnected = false;
+
+          if (batchTimeout) {
+            clearTimeout(batchTimeout);
+            batchTimeout = null;
+          }
+          audioBatchBuffer = [];
+
+          setTimeout(connectWebSocket, 500);
+        };
+
+        ws.onerror = function (error) {
+          console.error("WebSocket error:", error);
+        };
+      }
+
+      function handleRealtimeMessage(data) {
+        console.log("Received:", data);
+
+        switch (data.type) {
+          case "session.created":
+            console.log("Session created:", data.session.id);
+            currentConversationId = data.session.id;
+            break;
+
+          case "conversation.item.created":
+            if (
+              data.item.type === "message" &&
+              data.item.role === "assistant"
+            ) {
+              console.log("Assistant message created");
+            }
+            break;
+
+          case "response.text.delta":
+            updateStreamingMessage(data.delta, false);
+            break;
+
+          case "response.text.done":
+            finalizeStreamingMessage(data.text, false);
+            processingIndicator.classList.remove("active");
+            break;
+
+          case "response.audio.delta":
+            if (data.delta) {
+              playAudioDelta(data.delta);
+            }
+            break;
+
+          case "response.audio.done":
+            console.log("Audio response completed");
+            break;
+
+          case "input_audio_buffer.speech_started":
+            console.log("Speech started");
+            setTranscribing(true);
+            break;
+
+          case "input_audio_buffer.speech_stopped":
+            console.log("Speech stopped");
+            break;
+
+          case "input_audio_buffer.committed":
+            console.log("Audio buffer committed");
+            setTranscribing(false);
+            break;
+
+          case "conversation.item.input_audio_transcription.completed":
+            if (data.transcript) {
+              updateInputWithTranscription(data.transcript);
+            }
+            break;
+
+          case "conversation.item.input_audio_transcription.delta":
+            if (data.delta) {
+              updateInputWithTranscriptionDelta(data.delta);
+            }
+            break;
+
+          case "error":
+            console.error("Realtime API error:", data.error);
+            setTranscribing(false);
+            processingIndicator.classList.remove("active");
+            break;
+
+          default:
+            console.log("Unhandled message type:", data.type);
+        }
+      }
+
+      let currentStreamingMessage = null;
+      let currentTranscription = "";
+      let isTranscribing = false;
+      let baseInputText = "";
+
+      function updateInputWithTranscriptionDelta(delta) {
+        currentTranscription += delta;
+
+        const fullText =
+          baseInputText + (baseInputText ? " " : "") + currentTranscription;
+
+        requestAnimationFrame(() => {
+          messageInput.value = fullText;
+          messageInput.setSelectionRange(
+            messageInput.value.length,
+            messageInput.value.length
+          );
+        });
+      }
+
+      function updateInputWithTranscription(fullTranscript) {
+        if (fullTranscript.trim()) {
+          if (baseInputText) {
+            baseInputText += " " + fullTranscript.trim();
+          } else {
+            baseInputText = fullTranscript.trim();
+          }
+
+          requestAnimationFrame(() => {
+            messageInput.value = baseInputText;
+            messageInput.focus();
+            messageInput.setSelectionRange(
+              messageInput.value.length,
+              messageInput.value.length
+            );
+          });
+        }
+
+        currentTranscription = "";
+
+        setTranscribing(false);
+      }
+
+      function setTranscribing(transcribing) {
+        isTranscribing = transcribing;
+        recordBtn.disabled = transcribing;
+
+        if (transcribing) {
+          messageInput.placeholder = "Listening...";
+          baseInputText = messageInput.value.trim();
+          currentTranscription = "";
+        } else {
+          messageInput.placeholder = "Ask anything...";
+        }
+      }
+
+      let streamingUpdateQueue = [];
+      let streamingUpdateTimer = null;
+
+      function updateStreamingMessage(delta, isUser) {
+        if (!currentStreamingMessage) {
+          currentStreamingMessage = addMessage("", isUser);
+        }
+
+        streamingUpdateQueue.push(delta);
+
+        if (streamingUpdateTimer) {
+          clearTimeout(streamingUpdateTimer);
+        }
+
+        streamingUpdateTimer = setTimeout(() => {
+          if (currentStreamingMessage && streamingUpdateQueue.length > 0) {
+            const bubble =
+              currentStreamingMessage.querySelector(".message-bubble");
+            const combinedText = streamingUpdateQueue.join("");
+            bubble.textContent += combinedText;
+
+            streamingUpdateQueue = [];
+
+            requestAnimationFrame(() => {
+              messages.scrollTop = messages.scrollHeight;
+            });
+          }
+        }, 8);
+      }
+
+      function finalizeStreamingMessage(fullText, isUser) {
+        if (currentStreamingMessage) {
+          const bubble =
+            currentStreamingMessage.querySelector(".message-bubble");
+          bubble.textContent = fullText;
+          currentStreamingMessage = null;
+        } else {
+          addMessage(fullText, isUser);
+        }
+      }
+
+      function addMessage(text, isUser = false, type = "text") {
+        const messageDiv = document.createElement("div");
+        messageDiv.className = `message ${isUser ? "user" : "bot"}`;
+
+        let bubbleClass = "message-bubble";
+        if (type === "system") bubbleClass += " system";
+        if (type === "error") bubbleClass += " error";
+
+        messageDiv.innerHTML = `
+          <div class="${bubbleClass}">
+            ${text}
+          </div>
+        `;
+
+        messages.appendChild(messageDiv);
+        messages.scrollTop = messages.scrollHeight;
+
+        return messageDiv;
+      }
+
+      function sendTextMessage() {
+        const text = messageInput.value.trim();
+        if (!text || isTranscribing) return;
+
+        console.log("Sending message:", text);
+        addMessage(text, true);
+        messageInput.value = "";
+
+        baseInputText = "";
+        currentTranscription = "";
+
+        console.log("Setting timeout for bot response");
+        setTimeout(() => {
+          console.log("Adding bot response");
+          addMessage(
+            `Received your message: "${text}". This is a demo response.`,
+            false
+          );
+        }, 100);
+      }
+
+      function handleKeyDown(e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendTextMessage();
+        }
+      }
+
+      function selectModel(model) {
+        selectedModel = model;
+        tabs.forEach((tab) => {
+          tab.classList.toggle("active", tab.dataset.model === model);
+        });
+      }
+
+      async function toggleRecording() {
+        if (isRecording) {
+          await stopRecording();
+        } else {
+          await startRecording();
+        }
+      }
+
+      async function startRecording() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              sampleRate: 24000,
+              channelCount: 1,
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: false,
+              latency: 0,
+            },
+          });
+
+          audioContext = new (window.AudioContext || window.webkitAudioContext)(
+            {
+              sampleRate: 24000,
+            }
+          );
+
+          const source = audioContext.createMediaStreamSource(stream);
+          const processor = audioContext.createScriptProcessor(2048, 1, 1);
+
+          recordingStartTime = Date.now();
+
+          processor.onaudioprocess = function (e) {
+            if (!isRecording) return;
+
+            const inputData = e.inputBuffer.getChannelData(0);
+            const pcmData = new Int16Array(inputData.length);
+
+            for (let i = 0; i < inputData.length; i++) {
+              pcmData[i] = Math.max(
+                -32768,
+                Math.min(32767, inputData[i] * 32768)
+              );
+            }
+
+            const base64Audio = btoa(
+              String.fromCharCode(...new Uint8Array(pcmData.buffer))
+            );
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(
+                JSON.stringify({
+                  type: "input_audio_buffer.append",
+                  audio: base64Audio,
+                })
+              );
+            }
+          };
+
+          source.connect(processor);
+          processor.connect(audioContext.destination);
+
+          setRecording(true);
+
+          window.audioStream = stream;
+          window.audioProcessor = processor;
+        } catch (error) {
+          console.error("Recording error:", error);
+        }
+      }
+
+      async function stopRecording() {
+        const recordingDuration = Date.now() - recordingStartTime;
+        if (recordingDuration < minRecordingDuration) {
+          console.log(
+            `Recording too short: ${recordingDuration}ms, minimum required: ${minRecordingDuration}ms`
+          );
+
+          if (window.audioStream) {
+            window.audioStream.getTracks().forEach((track) => track.stop());
+          }
+
+          if (window.audioProcessor) {
+            window.audioProcessor.disconnect();
+          }
+
+          if (audioContext) {
+            await audioContext.close();
+          }
+
+          setRecording(false);
+          return;
+        }
+
+        if (window.audioStream) {
+          window.audioStream.getTracks().forEach((track) => track.stop());
+        }
+
+        if (window.audioProcessor) {
+          window.audioProcessor.disconnect();
+        }
+
+        if (audioContext) {
+          await audioContext.close();
+        }
+
+        ws.send(
+          JSON.stringify({
+            type: "input_audio_buffer.commit",
+          })
+        );
+
+        setRecording(false);
+      }
+
+      function setRecording(recording) {
+        isRecording = recording;
+        recordBtn.classList.toggle("recording", recording);
+
+        if (recording) {
+          recordBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
+              <line x1="8" y1="23" x2="16" y2="23"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          `;
+        } else {
+          recordBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
+              <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+          `;
+        }
+
+        recordingIndicator.classList.toggle("active", recording);
+        messageInput.placeholder = "Ask anything...";
+      }
+
+      function sendAudioBatch() {
+        if (
+          audioBatchBuffer.length === 0 ||
+          !ws ||
+          ws.readyState !== WebSocket.OPEN
+        ) {
+          return;
+        }
+
+        for (const audioData of audioBatchBuffer) {
+          ws.send(
+            JSON.stringify({
+              type: "input_audio_buffer.append",
+              audio: audioData,
+            })
+          );
+        }
+
+        audioBatchBuffer = [];
+
+        if (batchTimeout) {
+          clearTimeout(batchTimeout);
+          batchTimeout = null;
+        }
+      }
+
+      function checkBrowserSupport() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          console.log("Browser does not support audio recording");
+          recordBtn.disabled = true;
+        }
+
+        if (!window.WebSocket) {
+          console.log("WebSocket not supported");
+        }
+
+        if (!window.AudioContext && !window.webkitAudioContext) {
+          console.log("Web Audio API not supported");
+        }
+      }
+    </script>
+  </body>
+</html>
